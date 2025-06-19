@@ -19,7 +19,6 @@ def _load_path_from_env(key, check=True):
     return os.path.normpath(os.path.expanduser(v))
 
 
-CCNET_CONF_DIR = _load_path_from_env('CCNET_CONF_DIR')
 SEAFILE_CONF_DIR = _load_path_from_env('SEAFILE_CONF_DIR')
 SEAFILE_CENTRAL_CONF_DIR = _load_path_from_env(
     'SEAFILE_CENTRAL_CONF_DIR', check=False)
