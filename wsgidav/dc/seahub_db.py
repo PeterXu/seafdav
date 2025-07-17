@@ -1,3 +1,4 @@
+import os
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine
@@ -7,10 +8,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import Pool
 from sqlalchemy.ext.automap import automap_base
 
-Base = automap_base()
-
 import wsgidav.util as util
+
+Base = automap_base()
 _logger = util.get_module_logger(__name__)
+
 
 def init_db_session_class():
     try:
@@ -25,25 +27,34 @@ def init_db_session_class():
         _logger.warning('Failed to init seahub db: %s.', e)
         return None
 
-def create_seahub_db_engine():
-    import seahub_settings
-    db_infos = seahub_settings.DATABASES['default']
-    #import local_settings
-    #db_infos = local_settings.DATABASES['default']
 
-    if db_infos.get('ENGINE') != 'django.db.backends.mysql':
-        _logger.warning('Failed to init seahub db, only mysql db supported.')
-        return
+def create_seahub_db_engine():
+
+    # import seahub_settings
+    # db_infos = seahub_settings.DATABASES['default']
+    # import local_settings
+    # db_infos = local_settings.DATABASES['default']
+    # if db_infos.get('ENGINE') != 'django.db.backends.mysql':
+    #     _logger.warning('Failed to init seahub db, only mysql db supported.')
+    #     return
+
+    db_infos = {
+        'HOST': os.environ.get('SEAFILE_MYSQL_DB_HOST'),
+        'PORT': os.environ.get('SEAFILE_MYSQL_DB_PORT'),
+        'USER': os.environ.get('SEAFILE_MYSQL_DB_USER'),
+        'PASSWORD': os.environ.get('SEAFILE_MYSQL_DB_PASSWORD'),
+        'NAME': os.environ.get('SEAFILE_MYSQL_DB_SEAHUB_DB_NAME')
+    }
 
     db_host = db_infos.get('HOST', '127.0.0.1')
     db_port = int(db_infos.get('PORT', '3306'))
     db_name = db_infos.get('NAME')
     if not db_name:
-        _logger.warning ('Failed to init seahub db, db name is not set.')
+        _logger.warning('Failed to init seahub db, db name is not set.')
         return
     db_user = db_infos.get('USER')
     if not db_user:
-        _logger.warning ('Failed to init seahub db, db user is not set.')
+        _logger.warning('Failed to init seahub db, db user is not set.')
         return
     db_passwd = db_infos.get('PASSWORD')
 
@@ -52,7 +63,6 @@ def create_seahub_db_engine():
 
     if not db_passwd and db_host.startswith('/'):
         db_url = f"mysql+pymysql://{db_user}:@localhost:{db_port}/{db_name}?unix_socket={db_host}&charset=utf8"
-
 
     # Add pool recycle, or mysql connection will be closed by mysqld if idle
     # for too long.
@@ -66,19 +76,23 @@ def create_seahub_db_engine():
 
     return engine
 
+
 # This is used to fix the problem of "MySQL has gone away" that happens when
 # mysql server is restarted or the pooled connections are closed by the mysql
 # server beacause being idle for too long.
 #
 # See http://stackoverflow.com/a/17791117/1467959
-def ping_connection(dbapi_connection, connection_record, connection_proxy): # pylint: disable=unused-argument
+# pylint: disable=unused-argument
+def ping_connection(dbapi_connection, connection_record, connection_proxy):
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute("SELECT 1")
         cursor.close()
-    except:
+    except Exception as e:
+        _logger.error(e)
         _logger.info('fail to ping database server, disposing all cached connections')
-        connection_proxy._pool.dispose() # pylint: disable=protected-access
+        # pylint: disable=protected-access
+        connection_proxy._pool.dispose()
 
         # Raise DisconnectionError so the pool would create a new connection
         raise DisconnectionError()
