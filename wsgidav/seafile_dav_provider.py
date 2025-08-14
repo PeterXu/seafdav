@@ -248,6 +248,10 @@ class SeafileResource(DAVNonCollection):
                     raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
                 seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
                                      self.username, None)
+                # **Reload the SeafFile object to pick up the new obj_id (ETag)**
+                repo, rel_path, new_obj = resolvePath(self.path, self.username,
+                                                      self.org_id, self.is_guest)
+                self.obj = new_obj
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
         finally:
@@ -904,6 +908,7 @@ def get_group_repos(username, org_id):
         group_repos = seafile_api.get_group_repos_by_user(username)
 
     return [repo for repo in group_repos if repo.repo_type != 'wiki']
+
 
 def get_owned_repos(username, org_id):
     if org_id:
